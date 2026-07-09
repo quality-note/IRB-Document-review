@@ -9,6 +9,8 @@ import type {
   StaffMemo,
   OpinionTone,
   DocumentType,
+  FindingCategory,
+  Severity,
 } from "../types/review";
 import type { KnowledgeBaseItem } from "../types/knowledgeBase";
 import {
@@ -32,6 +34,7 @@ interface NewProjectInput {
   reviewer: string;
   receivedDate: string;
   memo: string;
+  researcherId?: string;
 }
 
 interface ReviewDataContextValue {
@@ -46,6 +49,7 @@ interface ReviewDataContextValue {
   setAiAnalysisEnabled: (v: boolean) => void;
 
   getProject: (id: string) => ReviewProject | undefined;
+  getProjectsByResearcher: (researcherId: string) => ReviewProject[];
   getDocumentsByProject: (id: string) => UploadedDocument[];
   getFindingsByProject: (id: string) => ReviewFinding[];
   getInconsistenciesByProject: (id: string) => DocumentInconsistency[];
@@ -54,11 +58,40 @@ interface ReviewDataContextValue {
 
   createProject: (input: NewProjectInput) => ReviewProject;
   updateProjectStatus: (id: string, status: ReviewProject["status"]) => void;
-  addDocument: (projectId: string, documentType: DocumentType, fileName: string) => void;
+  assignResearcher: (id: string, researcherId: string) => void;
+  addDocument: (projectId: string, documentType: DocumentType, fileName: string, uploadedBy?: string) => void;
   runAiReview: (projectId: string) => Promise<{ findingsCount: number; inconsistenciesCount: number; summary: string }>;
+
+  // 행정간사가 근거자료 기반 AI 검토 외에 수기로 직접 추가하는 검토 항목
+  addManualFinding: (input: {
+    projectId: string;
+    category: FindingCategory;
+    severity: Severity;
+    title: string;
+    description: string;
+    sourceDocument: string;
+    recommendation: string;
+    basisIds: string[];
+  }) => void;
+  addManualInconsistency: (input: {
+    projectId: string;
+    itemName: string;
+    protocolValue: string;
+    consentValue: string;
+    reportValue: string;
+    otherValue: string;
+    finding: string;
+  }) => void;
 
   toggleFindingResolved: (findingId: string) => void;
   updateInconsistencyStatus: (id: string, status: DocumentInconsistency["confirmationStatus"]) => void;
+  updateFindingResponse: (findingId: string, response: string) => void;
+  updateInconsistencyResponse: (id: string, response: string) => void;
+
+  // 담당자 워크플로우: 행정간사가 담당자에게 전달 → 담당자가 답변 제출 → 행정간사가 최종 접수
+  sendToResearcher: (projectId: string) => void;
+  submitResearcherResponse: (projectId: string) => void;
+  finalizeProject: (projectId: string) => void;
 
   saveOpinionDraft: (projectId: string, tone: OpinionTone, content: string, createdBy: string) => OpinionDraft;
   addStaffMemo: (projectId: string, author: string, content: string) => void;
@@ -82,6 +115,8 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<ReviewDataContextValue>(() => {
     const getProject = (id: string) => projects.find((p) => p.id === id);
+    const getProjectsByResearcher = (researcherId: string) =>
+      projects.filter((p) => p.researcherId === researcherId);
     const getDocumentsByProject = (id: string) => documents.filter((d) => d.projectId === id);
     const getFindingsByProject = (id: string) => findings.filter((f) => f.projectId === id);
     const getInconsistenciesByProject = (id: string) => inconsistencies.filter((i) => i.projectId === id);
@@ -101,13 +136,19 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
       return project;
     };
 
+    const assignResearcher = (id: string, researcherId: string) => {
+      setProjects((prev) =>
+        prev.map((p) => (p.id === id ? { ...p, researcherId, updatedAt: new Date().toISOString() } : p))
+      );
+    };
+
     const updateProjectStatus = (id: string, status: ReviewProject["status"]) => {
       setProjects((prev) =>
         prev.map((p) => (p.id === id ? { ...p, status, updatedAt: new Date().toISOString() } : p))
       );
     };
 
-    const addDocument = (projectId: string, documentType: DocumentType, fileName: string) => {
+    const addDocument = (projectId: string, documentType: DocumentType, fileName: string, uploadedBy?: string) => {
       const doc: UploadedDocument = {
         id: generateId("doc"),
         projectId,
@@ -115,6 +156,7 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
         fileName,
         fileUrl: "#",
         uploadedAt: new Date().toISOString(),
+        uploadedBy,
       };
       setDocuments((prev) => [...prev, doc]);
     };
@@ -138,6 +180,40 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
       };
     };
 
+    const addManualFinding: ReviewDataContextValue["addManualFinding"] = (input) => {
+      const finding: ReviewFinding = {
+        id: generateId("find"),
+        projectId: input.projectId,
+        category: input.category,
+        severity: input.severity,
+        title: input.title,
+        description: input.description,
+        sourceDocument: input.sourceDocument || "-",
+        recommendation: input.recommendation,
+        basisIds: input.basisIds,
+        humanReviewRequired: true,
+        resolved: false,
+        createdAt: new Date().toISOString(),
+      };
+      setFindings((prev) => [...prev, finding]);
+    };
+
+    const addManualInconsistency: ReviewDataContextValue["addManualInconsistency"] = (input) => {
+      const inconsistency: DocumentInconsistency = {
+        id: generateId("incon"),
+        projectId: input.projectId,
+        createdAt: new Date().toISOString(),
+        itemName: input.itemName,
+        protocolValue: input.protocolValue || "-",
+        consentValue: input.consentValue || "-",
+        reportValue: input.reportValue || "-",
+        otherValue: input.otherValue || "-",
+        finding: input.finding,
+        confirmationStatus: "미확인",
+      };
+      setInconsistencies((prev) => [...prev, inconsistency]);
+    };
+
     const toggleFindingResolved = (findingId: string) => {
       setFindings((prev) =>
         prev.map((f) => (f.id === findingId ? { ...f, resolved: !f.resolved } : f))
@@ -146,6 +222,44 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
 
     const updateInconsistencyStatus = (id: string, status: DocumentInconsistency["confirmationStatus"]) => {
       setInconsistencies((prev) => prev.map((i) => (i.id === id ? { ...i, confirmationStatus: status } : i)));
+    };
+
+    const updateFindingResponse = (findingId: string, response: string) => {
+      setFindings((prev) =>
+        prev.map((f) =>
+          f.id === findingId
+            ? { ...f, researcherResponse: response, researcherRespondedAt: new Date().toISOString() }
+            : f
+        )
+      );
+    };
+
+    const updateInconsistencyResponse = (id: string, response: string) => {
+      setInconsistencies((prev) =>
+        prev.map((i) =>
+          i.id === id
+            ? { ...i, researcherResponse: response, researcherRespondedAt: new Date().toISOString() }
+            : i
+        )
+      );
+    };
+
+    const sendToResearcher = (projectId: string) => {
+      updateProjectStatus(projectId, "담당자 확인 중");
+    };
+
+    const submitResearcherResponse = (projectId: string) => {
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === projectId
+            ? { ...p, researcherSubmittedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+            : p
+        )
+      );
+    };
+
+    const finalizeProject = (projectId: string) => {
+      updateProjectStatus(projectId, "완료");
     };
 
     const saveOpinionDraft = (projectId: string, tone: OpinionTone, content: string, createdBy: string) => {
@@ -208,6 +322,7 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
       aiAnalysisEnabled,
       setAiAnalysisEnabled,
       getProject,
+      getProjectsByResearcher,
       getDocumentsByProject,
       getFindingsByProject,
       getInconsistenciesByProject,
@@ -215,10 +330,18 @@ export function ReviewDataProvider({ children }: { children: ReactNode }) {
       getStaffMemosByProject,
       createProject,
       updateProjectStatus,
+      assignResearcher,
       addDocument,
       runAiReview,
+      addManualFinding,
+      addManualInconsistency,
       toggleFindingResolved,
       updateInconsistencyStatus,
+      updateFindingResponse,
+      updateInconsistencyResponse,
+      sendToResearcher,
+      submitResearcherResponse,
+      finalizeProject,
       saveOpinionDraft,
       addStaffMemo,
       addKnowledgeBaseItem,

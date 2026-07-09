@@ -9,6 +9,7 @@ const ROLE_DESCRIPTIONS: Record<(typeof USER_ROLES)[number], string> = {
   행정간사: "검토 건 등록, 문서 업로드, AI 검토 실행, 행정의견 초안 작성 및 회신 관리",
   검토자: "검토 결과 확인 및 담당자 메모 작성, 담당자 확인 여부 갱신",
   "조회 전용": "검토 현황 및 결과 조회만 가능 (수정 불가)",
+  연구담당자: "행정간사가 발급한 계정으로 본인에게 할당된 연구과제만 확인 — 검토 항목 답변 작성 및 수정자료 업로드",
 };
 
 const STATUS_DESCRIPTIONS: Record<(typeof REVIEW_STATUSES)[number], string> = {

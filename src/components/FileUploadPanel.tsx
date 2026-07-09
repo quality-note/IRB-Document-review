@@ -7,12 +7,22 @@ import SafetyNotice from "./SafetyNotice";
 interface Props {
   documents: UploadedDocument[];
   onUpload: (documentType: DocumentType, fileName: string) => void;
-  onRunReview: () => void;
-  isRunning: boolean;
+  onRunReview?: () => void;
+  isRunning?: boolean;
   disabled?: boolean;
+  title?: string;
+  description?: string;
 }
 
-export default function FileUploadPanel({ documents, onUpload, onRunReview, isRunning, disabled }: Props) {
+export default function FileUploadPanel({
+  documents,
+  onUpload,
+  onRunReview,
+  isRunning,
+  disabled,
+  title = "심의서류 업로드",
+  description = "업로드 후 문서 목록에서 확인하고, AI 검토 실행 버튼을 눌러 사전 검토를 진행해 주세요.",
+}: Props) {
   const [documentType, setDocumentType] = useState<DocumentType>(DOCUMENT_TYPES[0]);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -24,8 +34,8 @@ export default function FileUploadPanel({ documents, onUpload, onRunReview, isRu
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="text-sm font-semibold text-navy-800">심의서류 업로드</h3>
-      <p className="mt-1 text-xs text-slate-500">업로드 후 문서 목록에서 확인하고, AI 검토 실행 버튼을 눌러 사전 검토를 진행해 주세요.</p>
+      <h3 className="text-sm font-semibold text-navy-800">{title}</h3>
+      <p className="mt-1 text-xs text-slate-500">{description}</p>
 
       <SafetyNotice type="uploadPrivacy" className="mt-3" />
 
@@ -84,17 +94,19 @@ export default function FileUploadPanel({ documents, onUpload, onRunReview, isRu
         ))}
       </div>
 
-      <div className="mt-5 flex justify-end">
-        <button
-          type="button"
-          onClick={onRunReview}
-          disabled={disabled || isRunning || documents.length === 0}
-          className="flex items-center gap-2 rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-slate-300"
-        >
-          {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-          {isRunning ? "AI 검토 실행 중..." : "AI 검토 실행"}
-        </button>
-      </div>
+      {onRunReview && (
+        <div className="mt-5 flex justify-end">
+          <button
+            type="button"
+            onClick={onRunReview}
+            disabled={disabled || isRunning || documents.length === 0}
+            className="flex items-center gap-2 rounded-md bg-teal-600 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-teal-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+          >
+            {isRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            {isRunning ? "AI 검토 실행 중..." : "AI 검토 실행"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

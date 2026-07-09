@@ -2,8 +2,10 @@ import { useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { PlusCircle, CheckCircle2, Check } from "lucide-react";
 import { useReviewData } from "../context/ReviewDataContext";
+import { useAuth } from "../context/AuthContext";
 import { STUDY_TYPES, type StudyType, type DocumentType } from "../types/review";
 import FileUploadPanel from "../components/FileUploadPanel";
+import ResearcherAssignPanel from "../components/ResearcherAssignPanel";
 import SafetyNotice from "../components/SafetyNotice";
 
 const REVIEWERS = ["백주환", "오은하"];
@@ -11,6 +13,7 @@ const REVIEWERS = ["백주환", "오은하"];
 export default function DocumentReview() {
   const { projects, getDocumentsByProject, createProject, addDocument, runAiReview, aiAnalysisEnabled } =
     useReviewData();
+  const { findUserById } = useAuth();
   const navigate = useNavigate();
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
@@ -26,6 +29,8 @@ export default function DocumentReview() {
     receivedDate: new Date().toISOString().slice(0, 10),
     memo: "",
   });
+  const [assignedResearcherId, setAssignedResearcherId] = useState<string>("");
+
   const [justCreated, setJustCreated] = useState(false);
 
   const selectedProject = projects.find((p) => p.id === selectedProjectId);
@@ -49,7 +54,12 @@ export default function DocumentReview() {
       alert("연구 유형을 하나 이상 선택해 주세요.");
       return;
     }
-    const project = createProject(form);
+    if (!assignedResearcherId) {
+      alert("연구담당자 계정을 지정해 주세요.");
+      return;
+    }
+
+    const project = createProject({ ...form, researcherId: assignedResearcherId });
     setSelectedProjectId(project.id);
     setJustCreated(true);
     setTimeout(() => setJustCreated(false), 2000);
@@ -63,11 +73,12 @@ export default function DocumentReview() {
       receivedDate: new Date().toISOString().slice(0, 10),
       memo: "",
     });
+    setAssignedResearcherId("");
   };
 
   const handleUpload = (documentType: DocumentType, fileName: string) => {
     if (!selectedProjectId) return;
-    addDocument(selectedProjectId, documentType, fileName);
+    addDocument(selectedProjectId, documentType, fileName, "행정간사");
   };
 
   const handleRunReview = async () => {
@@ -155,7 +166,7 @@ export default function DocumentReview() {
                 })}
               </div>
             </Field>
-            <Field label="검토 담당자">
+            <Field label="검토 담당자(행정간사)">
               <select
                 value={form.reviewer}
                 onChange={(e) => setForm({ ...form, reviewer: e.target.value })}
@@ -176,6 +187,27 @@ export default function DocumentReview() {
                 className="input resize-none"
               />
             </Field>
+          </div>
+
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <p className="text-xs font-medium text-slate-600">
+              연구담당자 계정 <span className="text-rose-500">*</span>
+            </p>
+            <p className="mt-0.5 text-xs text-slate-400">
+              이 연구과제의 검토 결과를 확인하고 답변·수정자료를 올릴 담당자 계정을 지정해 주세요.
+            </p>
+            <div className="mt-2">
+              <ResearcherAssignPanel
+                alwaysOpen
+                currentResearcherId={assignedResearcherId || undefined}
+                onAssign={setAssignedResearcherId}
+              />
+            </div>
+            {assignedResearcherId && (
+              <p className="mt-1.5 text-xs text-emerald-600">
+                지정됨: {findUserById(assignedResearcherId)?.name} ({assignedResearcherId})
+              </p>
+            )}
           </div>
 
           <div className="mt-4 flex items-center justify-end gap-3">
@@ -221,6 +253,12 @@ export default function DocumentReview() {
                 <span className="font-medium text-slate-600">담당자</span> {selectedProject.reviewer} ·{" "}
                 <span className="font-medium text-slate-600">상태</span> {selectedProject.status}
               </p>
+              {selectedProject.researcherId && (
+                <p>
+                  <span className="font-medium text-slate-600">연구담당자 계정</span>{" "}
+                  {findUserById(selectedProject.researcherId)?.name ?? selectedProject.researcherId}
+                </p>
+              )}
             </div>
           )}
 

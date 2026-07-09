@@ -102,7 +102,7 @@ const MOCK_FINDING_TEMPLATES: MockFindingTemplate[] = [
   },
 ];
 
-interface MockInconsistencyTemplate extends Omit<DocumentInconsistency, "id" | "projectId"> {
+interface MockInconsistencyTemplate extends Omit<DocumentInconsistency, "id" | "projectId" | "createdAt"> {
   anyOf?: DocumentType[];
   allOf?: DocumentType[];
 }
@@ -187,6 +187,7 @@ export async function analyzeDocuments(
   ).map(({ anyOf: _anyOf, allOf: _allOf, ...tpl }) => ({
     id: generateId("incon"),
     projectId: project.id,
+    createdAt: new Date().toISOString(),
     ...tpl,
   }));
 

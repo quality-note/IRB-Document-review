@@ -43,9 +43,9 @@ export const REVIEW_STATUSES: ReviewStatus[] = [
   "보류",
 ];
 
-export type UserRole = "관리자" | "행정간사" | "검토자" | "조회 전용";
+export type UserRole = "관리자" | "행정간사" | "검토자" | "조회 전용" | "연구담당자";
 
-export const USER_ROLES: UserRole[] = ["관리자", "행정간사", "검토자", "조회 전용"];
+export const USER_ROLES: UserRole[] = ["관리자", "행정간사", "검토자", "조회 전용", "연구담당자"];
 
 // 위험도는 행정검토 우선순위 구분이며, 연구의 법적 적합성·승인 가능성 판단이 아님
 export type Severity = "높음" | "중간" | "낮음" | "참고";
@@ -107,6 +107,10 @@ export interface ReviewProject {
   receivedDate: string; // ISO date string
   status: ReviewStatus;
   memo: string;
+  // 이 연구과제를 확인·답변할 수 있는 연구담당자 계정 (AuthUser.id). 미지정 시 담당자 화면에 노출되지 않음
+  researcherId?: string;
+  // 담당자가 답변/수정자료를 제출한 시각. 제출 후 행정간사가 확인하여 최종 접수(완료) 처리
+  researcherSubmittedAt?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,6 +123,8 @@ export interface UploadedDocument {
   fileUrl: string;
   uploadedAt: string;
   extractedText?: string;
+  // 업로드한 사람 이름 (행정간사 또는 연구담당자) — 최종 접수 시 어느 자료가 담당자 제출본인지 구분하기 위함
+  uploadedBy?: string;
 }
 
 export interface ReviewFinding {
@@ -134,6 +140,9 @@ export interface ReviewFinding {
   humanReviewRequired: true;
   resolved: boolean;
   createdAt: string;
+  // 연구담당자가 남긴 답변 (행정간사 화면에는 읽기 전용으로 표시됨)
+  researcherResponse?: string;
+  researcherRespondedAt?: string;
 }
 
 export interface DocumentInconsistency {
@@ -146,6 +155,9 @@ export interface DocumentInconsistency {
   otherValue: string;
   finding: string;
   confirmationStatus: "미확인" | "확인 중" | "확인 완료";
+  createdAt: string;
+  researcherResponse?: string;
+  researcherRespondedAt?: string;
 }
 
 export interface OpinionDraft {

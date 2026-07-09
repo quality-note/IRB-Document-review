@@ -4,14 +4,21 @@ import {
   logout as logoutService,
   getCurrentUser,
   changePassword as changePasswordService,
+  createUser as createUserService,
+  findUserById,
+  listUsersByRole,
   type AuthUser,
 } from "../services/authService";
+import type { UserRole } from "../types/review";
 
 interface AuthContextValue {
   user: AuthUser | null;
   login: (id: string, password: string) => boolean;
   logout: () => void;
   changePassword: (currentPassword: string, newPassword: string) => boolean;
+  createUser: (id: string, password: string, name: string, role: UserRole) => AuthUser;
+  findUserById: (id: string) => AuthUser | null;
+  listResearchers: () => AuthUser[];
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -36,8 +43,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return changePasswordService(user.id, currentPassword, newPassword);
   };
 
+  const createUser = (id: string, password: string, name: string, role: UserRole): AuthUser =>
+    createUserService(id, password, name, role);
+
+  const listResearchers = (): AuthUser[] => listUsersByRole("연구담당자");
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, changePassword }}>{children}</AuthContext.Provider>
+    <AuthContext.Provider
+      value={{ user, login, logout, changePassword, createUser, findUserById, listResearchers }}
+    >
+      {children}
+    </AuthContext.Provider>
   );
 }
 
